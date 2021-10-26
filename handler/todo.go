@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -36,15 +37,9 @@ func (h *TODOHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if reqBody.Subject == "" {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
-
-	ret, err := h.svc.CreateTODO(r.Context(), reqBody.Subject, reqBody.Description)
+	ret, err := h.Create(r.Context(), &reqBody)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("CreateTODO: %v", err), http.StatusInternalServerError)
-		return
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 	}
 
 	var buf bytes.Buffer
@@ -53,14 +48,24 @@ func (h *TODOHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("json encode: %v", err), http.StatusInternalServerError)
 	}
 
+	fmt.Println(ret)
+
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprint(w, buf.String())
 }
 
 // Create handles the endpoint that creates the TODO.
 func (h *TODOHandler) Create(ctx context.Context, req *model.CreateTODORequest) (*model.CreateTODOResponse, error) {
-	_, _ = h.svc.CreateTODO(ctx, req.Subject, req.Description)
-	return &model.CreateTODOResponse{}, nil
+
+	if req.Subject == "" {
+		return nil, errors.New("subject empty")
+	}
+
+	ret, err := h.svc.CreateTODO(ctx, req.Subject, req.Description)
+	if err != nil {
+		return nil, err
+	}
+	return &model.CreateTODOResponse{TODO:ret,}, nil
 }
 
 // Read handles the endpoint that reads the TODOs.

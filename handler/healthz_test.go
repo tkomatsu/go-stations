@@ -19,6 +19,10 @@ func TestHealthz(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if res.StatusCode != http.StatusOK {
+		t.Log("Incorrect response status")
+	}
+
 	var resBody model.HealthzResponse
 	dec := json.NewDecoder(res.Body)
 	if err := dec.Decode(&resBody); err != nil {
