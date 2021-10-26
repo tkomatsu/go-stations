@@ -25,11 +25,15 @@ func NewTODOHandler(svc *service.TODOService) *TODOHandler {
 }
 
 func (h *TODOHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
+	switch r.Method {
+	case "POST":
+		h.createHandler(w, r)
+	default:
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		return
 	}
+}
 
+func (h *TODOHandler) createHandler(w http.ResponseWriter, r *http.Request) {
 	var reqBody model.CreateTODORequest
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(&reqBody); err != nil {
@@ -40,15 +44,15 @@ func (h *TODOHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ret, err := h.Create(r.Context(), &reqBody)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
 	}
 
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	if err := enc.Encode(ret); err != nil {
 		http.Error(w, fmt.Sprintf("json encode: %v", err), http.StatusInternalServerError)
+		return
 	}
-
-	fmt.Println(ret)
 
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprint(w, buf.String())
@@ -56,7 +60,6 @@ func (h *TODOHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Create handles the endpoint that creates the TODO.
 func (h *TODOHandler) Create(ctx context.Context, req *model.CreateTODORequest) (*model.CreateTODOResponse, error) {
-
 	if req.Subject == "" {
 		return nil, errors.New("subject empty")
 	}
@@ -65,7 +68,7 @@ func (h *TODOHandler) Create(ctx context.Context, req *model.CreateTODORequest) 
 	if err != nil {
 		return nil, err
 	}
-	return &model.CreateTODOResponse{TODO:ret,}, nil
+	return &model.CreateTODOResponse{TODO: ret}, nil
 }
 
 // Read handles the endpoint that reads the TODOs.
