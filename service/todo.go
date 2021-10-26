@@ -26,6 +26,14 @@ func (s *TODOService) CreateTODO(ctx context.Context, subject, description strin
 		insert  = `INSERT INTO todos(subject, description) VALUES(?, ?)`
 		confirm = `SELECT subject, description, created_at, updated_at FROM todos WHERE id = ?`
 	)
+	stmtInsert, err := s.db.PrepareContext(ctx, insert)
+	if err != nil {
+		return nil, err
+	}
+	stmtConfirm, err := s.db.PrepareContext(ctx, confirm)
+	if err != nil {
+		return nil, err
+	}
 
 	// validate arguments
 	if subject == "" {
@@ -33,26 +41,18 @@ func (s *TODOService) CreateTODO(ctx context.Context, subject, description strin
 	}
 
 	// insert operation
-	stmt, err := s.db.PrepareContext(ctx, insert)
-	if err != nil {
-		return nil, err
-	}
-	ret, err := stmt.ExecContext(ctx, subject, description)
+	ret, err := stmtInsert.ExecContext(ctx, subject, description)
 	if err != nil {
 		return nil, err
 	}
 
 	// confirm operatrion
-	stmt, err = s.db.PrepareContext(ctx, confirm)
-	if err != nil {
-		return nil, err
-	}
 	id, err := ret.LastInsertId()
 	if err != nil {
 		return nil, err
 	}
 	var todo model.TODO
-	err = stmt.QueryRowContext(ctx, id).Scan(&todo.Subject, &todo.Description, &todo.CreatedAt, &todo.UpdatedAt)
+	err = stmtConfirm.QueryRowContext(ctx, id).Scan(&todo.Subject, &todo.Description, &todo.CreatedAt, &todo.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
