@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/TechBowl-japan/go-stations/model"
@@ -28,6 +29,8 @@ func (h *TODOHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST":
 		h.createHandler(w, r)
+	case "PUT":
+		h.updateHandler(w, r)
 	default:
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
@@ -58,6 +61,37 @@ func (h *TODOHandler) createHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, buf.String())
 }
 
+func (h *TODOHandler) updateHandler(w http.ResponseWriter, r *http.Request) {
+	var reqBody model.UpdateTODORequest
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&reqBody); err != nil {
+		http.Error(w, fmt.Errorf("json decode: %v", err).Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if reqBody.ID == 0 || reqBody.Subject == "" {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	ret, err := h.Update(r.Context(), &reqBody)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	if err := enc.Encode(ret); err != nil {
+		log.Print("json encode: ", err)
+		http.Error(w, fmt.Sprintf("json encode: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprint(w, buf.String())
+}
+
 // Create handles the endpoint that creates the TODO.
 func (h *TODOHandler) Create(ctx context.Context, req *model.CreateTODORequest) (*model.CreateTODOResponse, error) {
 	if req.Subject == "" {
@@ -79,8 +113,11 @@ func (h *TODOHandler) Read(ctx context.Context, req *model.ReadTODORequest) (*mo
 
 // Update handles the endpoint that updates the TODO.
 func (h *TODOHandler) Update(ctx context.Context, req *model.UpdateTODORequest) (*model.UpdateTODOResponse, error) {
-	_, _ = h.svc.UpdateTODO(ctx, 0, "", "")
-	return &model.UpdateTODOResponse{}, nil
+	ret, err := h.svc.UpdateTODO(ctx, req.ID, req.Subject, req.Description)
+	if err != nil {
+		return nil, err
+	}
+	return &model.UpdateTODOResponse{TODO: ret}, nil
 }
 
 // Delete handles the endpoint that deletes the TODOs.
