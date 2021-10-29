@@ -23,9 +23,14 @@ type (
 	}
 
 	// A ReadTODORequest expresses ...
-	ReadTODORequest struct{}
+	ReadTODORequest struct{
+		PrevID int64
+		Size   int64
+	}
 	// A ReadTODOResponse expresses ...
-	ReadTODOResponse struct{}
+	ReadTODOResponse struct{
+		TODOs []TODO `json:"todos"`
+	}
 
 	// A UpdateTODORequest expresses ...
 	UpdateTODORequest struct {
