@@ -66,8 +66,43 @@ func (s *TODOService) ReadTODO(ctx context.Context, prevID, size int64) ([]*mode
 		read       = `SELECT id, subject, description, created_at, updated_at FROM todos ORDER BY id DESC LIMIT ?`
 		readWithID = `SELECT id, subject, description, created_at, updated_at FROM todos WHERE id < ? ORDER BY id DESC LIMIT ?`
 	)
+	stmtRead, err := s.db.PrepareContext(ctx, read)
+	if err != nil {
+		return nil, err
+	}
+	stmtReadID, err := s.db.PrepareContext(ctx, readWithID)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, nil
+	var rows *sql.Rows
+	if prevID < 0 || size <= 0 {
+		return nil, errors.New("invalid argument")
+	}
+	if prevID == 0 {
+		rows, err = stmtRead.QueryContext(ctx, size)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		rows, err = stmtReadID.QueryContext(ctx, prevID, size)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	todos := make([]*model.TODO, 0)
+	for rows.Next() {
+		var todo model.TODO
+		if err := rows.Scan(&todo.ID, &todo.Subject, &todo.Description, &todo.CreatedAt, &todo.UpdatedAt); err != nil {
+			return nil, err
+		}
+		todos = append(todos, &todo)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return todos, nil
 }
 
 // UpdateTODO updates the TODO on DB.
