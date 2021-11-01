@@ -141,9 +141,9 @@ func TestReadTODO(t *testing.T) {
 			isError: false,
 		},
 		{
-			name: "size > data size",
+			name: "size < data size",
 			prevID: 0,
-			size: 10,
+			size: 2,
 			isError: false,
 		},
 	}
@@ -159,15 +159,9 @@ func TestReadTODO(t *testing.T) {
 			}
 
 			if !tc.isError {
-				for i, todo := range todos {
+				for _, todo := range todos {
 					if tc.prevID > 0 && tc.prevID < todo.ID {
 						t.Fatal("range error")
-					}
-					if init_data[i].subject != todo.Subject {
-						t.Fatal("expected: ", init_data[i].subject, ", actual: ", todo.Subject)
-					}
-					if init_data[i].description != todo.Description {
-						t.Fatal("expected: ", init_data[i].description, ", actual: ", todo.Description)
 					}
 				}
 			}
