@@ -2,9 +2,12 @@ package handler_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/TechBowl-japan/go-stations/db"
@@ -13,8 +16,28 @@ import (
 	"github.com/TechBowl-japan/go-stations/service"
 )
 
+var init_data = []struct {
+	subject     string
+	description string
+}{
+	{
+		subject: "foo",
+		description: "this is foo",
+	},
+	{
+		subject: "bar",
+		description: "this is bar",
+	},
+	{
+		subject: "baz",
+		description: "this is baz",
+	},
+}
+
+const dbpath = "./todo_temp.db"
+
 func TestCreate(t *testing.T) {
-	todoDB, err := db.NewDB("../.sqlite3/todo_test.db")
+	todoDB, err := db.NewDB(dbpath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,14 +119,106 @@ func TestCreate(t *testing.T) {
 			t.Logf("Incorrect status code: %v", res.StatusCode)
 		}
 	})
+
+	if err := os.Remove(dbpath); err != nil {
+		t.Log(err)
+	}
 }
 
-func TestUpdate(t *testing.T) {
-	todoDB, err := db.NewDB("../.sqlite3/todo_test.db")
+func TestRead(t *testing.T) {
+	todoDB, err := db.NewDB(dbpath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer todoDB.Close()
+
+	ctx := context.Background()
+
+	stmt, err := todoDB.PrepareContext(ctx, "INSERT INTO todos(subject, description) VALUES(?, ?)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, data := range init_data {
+		if _, err := stmt.ExecContext(ctx, data.subject, data.description); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	ts := httptest.NewServer(handler.NewTODOHandler(service.NewTODOService(todoDB)))
+	defer ts.Close()
+
+	cli := http.DefaultClient
+
+	testcase := []struct {
+		name string
+		req model.ReadTODORequest
+		wantStatus int
+	}{
+		{
+			name: "normal",
+			req: model.ReadTODORequest{
+				PrevID: 2,
+				Size:   3,
+			},
+			wantStatus: http.StatusOK,
+		},
+	}
+
+	for _, tc := range testcase {
+		t.Run(tc.name, func (t *testing.T) {
+			httpReq, err := http.NewRequest("GET", ts.URL, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			params := httpReq.URL.Query()
+			params.Add("prev_id", strconv.Itoa(int(tc.req.PrevID)))
+			params.Add("size", strconv.Itoa(int(tc.req.Size)))
+			httpReq.URL.RawQuery = params.Encode()
+
+			res, err := cli.Do(httpReq)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.StatusCode != tc.wantStatus {
+				t.Fatal("Incorrect response status")
+			}
+			if tc.wantStatus == http.StatusOK {
+				var resBody model.UpdateTODOResponse
+				dec := json.NewDecoder(res.Body)
+				if err := dec.Decode(&resBody); err != nil {
+					t.Fatal(err)
+				}
+				if resBody.TODO == nil {
+					t.Fatal("TODO empty")
+				}
+			}
+		})
+	}
+
+	if err := os.Remove(dbpath); err != nil {
+		t.Log(err)
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	todoDB, err := db.NewDB(dbpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer todoDB.Close()
+
+	ctx := context.Background()
+
+	stmt, err := todoDB.PrepareContext(ctx, "INSERT INTO todos(subject, description) VALUES(?, ?)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, data := range init_data {
+		if _, err := stmt.ExecContext(ctx, data.subject, data.description); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	ts := httptest.NewServer(handler.NewTODOHandler(service.NewTODOService(todoDB)))
 	defer ts.Close()
@@ -199,5 +314,9 @@ func TestUpdate(t *testing.T) {
 				}
 			}
 		})
+	}
+
+	if err := os.Remove(dbpath); err != nil {
+		t.Log(err)
 	}
 }
