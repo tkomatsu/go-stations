@@ -172,3 +172,94 @@ func TestReadTODO(t *testing.T) {
 		t.Log(err)
 	}
 }
+
+func TestUpdateTODO(t *testing.T) {
+	dbpath := "./todo_temp.db"
+	todoDB, err := db.NewDB(dbpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer todoDB.Close()
+
+	ctx := context.Background()
+
+	stmt, err := todoDB.PrepareContext(ctx, "INSERT INTO todos(subject, description) VALUES(?, ?)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, data := range init_data {
+		if _, err := stmt.ExecContext(ctx, data.subject, data.description); err != nil {
+			t.Fatal(err)
+		}
+	}
+	svc := service.NewTODOService(todoDB)
+
+	testcase := []struct {
+		name        string
+		id          int64
+		subject     string
+		description string
+		isError     bool
+	}{
+		{
+			name: "normal",
+			id: 1,
+			subject: "update subject",
+			description: "discription update",
+			isError: false,
+		},
+		{
+			name: "empty id",
+			id: 0,
+			subject: "update subject",
+			description: "discription update",
+			isError: true,
+		},
+		{
+			name: "empty subject",
+			id: 1,
+			subject: "",
+			description: "discription update",
+			isError: true,
+		},
+		{
+			name: "empty id and subject",
+			id: 0,
+			subject: "",
+			description: "discription update",
+			isError: true,
+		},
+		{
+			name: "empty description",
+			id: 2,
+			subject: "update",
+			description: "",
+			isError: false,
+		},
+	}
+
+	for _, tc := range testcase {
+		t.Run(tc.name, func (t *testing.T) {
+			todo, err := svc.UpdateTODO(ctx, tc.id, tc.subject, tc.description)
+			switch {
+			case tc.isError && err == nil:
+				t.Fatal("expected err, but err is nil")
+			case !tc.isError && err != nil:
+				t.Fatal("not expected err, but err is not nil: ", err)
+			}
+
+			if !tc.isError {
+				if tc.subject != todo.Subject {
+					t.Fatal("expected: ", tc.subject, ", actual: ", todo.Subject)
+				}
+				if tc.description != todo.Description {
+					t.Fatal("expected: ", tc.description, ", actual: ", todo.Description)
+				}
+			}
+		})
+	}
+
+	if err := os.Remove(dbpath); err != nil {
+		t.Log(err)
+	}
+}
