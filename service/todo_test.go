@@ -111,46 +111,60 @@ func TestReadTODO(t *testing.T) {
 	svc := service.NewTODOService(todoDB)
 
 	testcase := []struct {
-		name    string
-		prevID  int64
-		size    int64
-		isError bool
+		name               string
+		prevID             int64
+		size               int64
+		isError            bool
+		expectedTodoLength int
 	}{
 		{
 			name: "normal",
 			prevID: 2,
 			size: 2,
 			isError: false,
+			expectedTodoLength: 1,
 		},
 		{
 			name: "error",
 			prevID: -1,
 			size: -1,
 			isError: true,
+			expectedTodoLength: 0,
 		},
 		{
 			name: "size > data size",
 			prevID: 0,
-			size: 10,
+			size: 4,
 			isError: false,
+			expectedTodoLength: 3,
 		},
 		{
-			name: "prevID",
+			name: "prevID 1",
+			prevID: 3,
+			size: 10,
+			isError: false,
+			expectedTodoLength: 2,
+		},
+		{
+			name: "prevID 2",
 			prevID: 1,
 			size: 10,
 			isError: false,
+			expectedTodoLength: 0,
 		},
 		{
 			name: "size < data size",
 			prevID: 0,
-			size: 2,
+			size: 3,
 			isError: false,
+			expectedTodoLength: 3,
 		},
 	}
 
 	for _, tc := range testcase {
 		t.Run(tc.name, func (t *testing.T) {
 			todos, err := svc.ReadTODO(ctx, tc.prevID, tc.size)
+
 			switch {
 			case tc.isError && err == nil:
 				t.Fatal("expected err, but err is nil")
@@ -159,6 +173,9 @@ func TestReadTODO(t *testing.T) {
 			}
 
 			if !tc.isError {
+				if tc.expectedTodoLength != len(todos) {
+					t.Fatal("count error")
+				}
 				for _, todo := range todos {
 					if tc.prevID > 0 && tc.prevID < todo.ID {
 						t.Fatal("range error")
