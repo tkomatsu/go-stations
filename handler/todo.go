@@ -98,16 +98,20 @@ func (h *TODOHandler) updateHandler(w http.ResponseWriter, r *http.Request) {
 func (h *TODOHandler) readHandler(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	var reqBody model.ReadTODORequest
-	prevId, err := strconv.Atoi(params.Get("prev_id"))
-	if err != nil {
-		http.Error(w, fmt.Sprintf("get prev_id: %v", err), http.StatusInternalServerError)
+	if params.Get("prev_id") != "" {
+		prevId, err := strconv.Atoi(params.Get("prev_id"))
+		if err != nil {
+			http.Error(w, fmt.Sprintf("get prev_id: %v", err), http.StatusInternalServerError)
+		}
+		reqBody.PrevID = int64(prevId)
 	}
-	reqBody.PrevID = int64(prevId)
-	size, err := strconv.Atoi(params.Get("size"))
-	if err != nil {
-		http.Error(w, fmt.Sprintf("get size: %v", err), http.StatusInternalServerError)
+	if params.Get("size") != "" {
+		size, err := strconv.Atoi(params.Get("size"))
+		if err != nil {
+			http.Error(w, fmt.Sprintf("get size: %v", err), http.StatusInternalServerError)
+		}
+		reqBody.Size = int64(size)
 	}
-	reqBody.Size = int64(size)
 
 	ret, err := h.Read(r.Context(), &reqBody)
 	if err != nil {

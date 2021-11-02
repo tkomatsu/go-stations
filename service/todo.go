@@ -76,7 +76,7 @@ func (s *TODOService) ReadTODO(ctx context.Context, prevID, size int64) ([]*mode
 	}
 
 	var rows *sql.Rows
-	if prevID < 0 || size <= 0 {
+	if prevID < 0 || size < 0 {
 		return nil, errors.New("invalid argument")
 	}
 	if prevID == 0 {
