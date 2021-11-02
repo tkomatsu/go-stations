@@ -115,6 +115,7 @@ func (h *TODOHandler) readHandler(w http.ResponseWriter, r *http.Request) {
 
 	ret, err := h.Read(r.Context(), &reqBody)
 	if err != nil {
+		log.Print(err)
 		http.NotFound(w, r)
 		return
 	}

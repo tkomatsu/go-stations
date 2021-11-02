@@ -79,6 +79,9 @@ func (s *TODOService) ReadTODO(ctx context.Context, prevID, size int64) ([]*mode
 	if prevID < 0 || size < 0 {
 		return nil, errors.New("invalid argument")
 	}
+	if size == 0 {
+		size = -1
+	}
 	if prevID == 0 {
 		rows, err = stmtRead.QueryContext(ctx, size)
 		if err != nil {
