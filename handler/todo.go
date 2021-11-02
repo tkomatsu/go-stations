@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/TechBowl-japan/go-stations/model"
 	"github.com/TechBowl-japan/go-stations/service"
@@ -31,6 +32,8 @@ func (h *TODOHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.createHandler(w, r)
 	case "PUT":
 		h.updateHandler(w, r)
+	case "GET":
+		h.readHandler(w, r)
 	default:
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
@@ -92,6 +95,38 @@ func (h *TODOHandler) updateHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, buf.String())
 }
 
+func (h *TODOHandler) readHandler(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
+	var reqBody model.ReadTODORequest
+	prevId, err := strconv.Atoi(params.Get("prev_id"))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("get prev_id: %v", err), http.StatusInternalServerError)
+	}
+	reqBody.PrevID = int64(prevId)
+	size, err := strconv.Atoi(params.Get("size"))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("get size: %v", err), http.StatusInternalServerError)
+	}
+	reqBody.Size = int64(size)
+
+	ret, err := h.Read(r.Context(), &reqBody)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	if err := enc.Encode(ret); err != nil {
+		log.Print("json encode: ", err)
+		http.Error(w, fmt.Sprintf("json encode: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-type", "application/json")
+	fmt.Fprint(w, buf.String())
+}
+
 // Create handles the endpoint that creates the TODO.
 func (h *TODOHandler) Create(ctx context.Context, req *model.CreateTODORequest) (*model.CreateTODOResponse, error) {
 	if req.Subject == "" {
@@ -107,8 +142,11 @@ func (h *TODOHandler) Create(ctx context.Context, req *model.CreateTODORequest) 
 
 // Read handles the endpoint that reads the TODOs.
 func (h *TODOHandler) Read(ctx context.Context, req *model.ReadTODORequest) (*model.ReadTODOResponse, error) {
-	_, _ = h.svc.ReadTODO(ctx, 0, 0)
-	return &model.ReadTODOResponse{}, nil
+	ret, err := h.svc.ReadTODO(ctx, req.PrevID, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	return &model.ReadTODOResponse{TODOs: ret}, nil
 }
 
 // Update handles the endpoint that updates the TODO.
