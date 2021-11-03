@@ -4,7 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strconv"
+	"fmt"
+	"strings"
 
 	"github.com/TechBowl-japan/go-stations/model"
 )
@@ -149,27 +150,22 @@ func (s *TODOService) DeleteTODO(ctx context.Context, ids []int64) error {
 	}
 
 	const deleteFmt = `DELETE FROM todos WHERE id IN (?%s)`
-	stmt, err := s.db.PrepareContext(ctx, deleteFmt)
+	stmt, err := s.db.PrepareContext(ctx, fmt.Sprintf(deleteFmt, strings.Repeat(",?", len(ids)-1)))
 	if err != nil {
-		return err
+		return fmt.Errorf("PrepareContext: %w", err)
 	}
 
-	var deleteList string
-	for i, id := range ids {
-		if i == 0 {
-			deleteList = strconv.Itoa(int(id))
-		} else {
-			deleteList = deleteList + "," + strconv.Itoa(int(id))
-		}
+	var args []interface{}
+	for _, id := range ids {
+		args = append(args, id)
 	}
-
-	ret, err := stmt.ExecContext(ctx, deleteList)
+	ret, err := stmt.ExecContext(ctx, args...)
 	if err != nil {
-		return err
+		return fmt.Errorf("ExecContext: %v: %w", args, err)
 	}
 	affected, err := ret.RowsAffected()
 	if err != nil {
-		return err
+		return fmt.Errorf("RowsAffected: %v: %w", args, err)
 	}
 
 	if affected == 0 {

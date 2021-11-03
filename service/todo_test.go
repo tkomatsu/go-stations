@@ -280,3 +280,55 @@ func TestUpdateTODO(t *testing.T) {
 		t.Log(err)
 	}
 }
+
+func TestDeleteTODO(t *testing.T) {
+	dbpath := "./todo_temp.db"
+	todoDB, err := db.NewDB(dbpath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer todoDB.Close()
+
+	ctx := context.Background()
+
+	stmt, err := todoDB.PrepareContext(ctx, "INSERT INTO todos(subject, description) VALUES(?, ?)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, data := range init_data {
+		if _, err := stmt.ExecContext(ctx, data.subject, data.description); err != nil {
+			t.Fatal(err)
+		}
+	}
+	svc := service.NewTODOService(todoDB)
+
+	testcase := []struct {
+		name string
+		ids  []int64
+		err  error
+	}{
+		{
+			name: "normal",
+			ids: []int64{1},
+			err: nil,
+		},
+		{
+			name: "empty id",
+			ids: []int64{},
+			err: nil,
+		},
+	}
+
+	for _, tc := range testcase {
+		t.Run(tc.name, func (t *testing.T) {
+			err := svc.DeleteTODO(ctx, tc.ids)
+			if tc.err != err {
+				t.Fatal("expected: ", tc.err, ", actual: ", err)
+			}
+		})
+	}
+
+	if err := os.Remove(dbpath); err != nil {
+		t.Log(err)
+	}
+}
