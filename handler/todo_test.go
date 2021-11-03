@@ -21,15 +21,15 @@ var init_data = []struct {
 	description string
 }{
 	{
-		subject: "foo",
+		subject:     "foo",
 		description: "this is foo",
 	},
 	{
-		subject: "bar",
+		subject:     "bar",
 		description: "this is bar",
 	},
 	{
-		subject: "baz",
+		subject:     "baz",
 		description: "this is baz",
 	},
 }
@@ -47,8 +47,8 @@ func TestCreate(t *testing.T) {
 	defer ts.Close()
 
 	testcase := []struct {
-		name string
-		req model.CreateTODORequest
+		name       string
+		req        model.CreateTODORequest
 		wantStatus int
 	}{
 		{
@@ -76,7 +76,7 @@ func TestCreate(t *testing.T) {
 	}
 
 	for _, tc := range testcase {
-		t.Run(tc.name, func (t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			enc := json.NewEncoder(&buf)
 			if err := enc.Encode(tc.req); err != nil {
@@ -95,7 +95,7 @@ func TestCreate(t *testing.T) {
 				if err := dec.Decode(&resBody); err != nil {
 					t.Fatal(err)
 				}
-			
+
 				if resBody.TODO == nil {
 					t.Fatal("TODO empty")
 				}
@@ -109,12 +109,12 @@ func TestCreate(t *testing.T) {
 		})
 	}
 
-	t.Run("not allowed method", func (t *testing.T) {
+	t.Run("not allowed method", func(t *testing.T) {
 		res, err := http.Get(ts.URL)
 		if err != nil {
 			t.Log("Request with GET failed")
 		}
-	
+
 		if res.StatusCode != http.StatusMethodNotAllowed {
 			t.Logf("Incorrect status code: %v", res.StatusCode)
 		}
@@ -150,8 +150,8 @@ func TestRead(t *testing.T) {
 	cli := http.DefaultClient
 
 	testcase := []struct {
-		name string
-		req model.ReadTODORequest
+		name       string
+		req        model.ReadTODORequest
 		wantStatus int
 	}{
 		{
@@ -165,7 +165,7 @@ func TestRead(t *testing.T) {
 	}
 
 	for _, tc := range testcase {
-		t.Run(tc.name, func (t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			httpReq, err := http.NewRequest("GET", ts.URL, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -188,9 +188,6 @@ func TestRead(t *testing.T) {
 				dec := json.NewDecoder(res.Body)
 				if err := dec.Decode(&resBody); err != nil {
 					t.Fatal(err)
-				}
-				if resBody.TODO == nil {
-					t.Fatal("TODO empty")
 				}
 			}
 		})
@@ -226,15 +223,15 @@ func TestUpdate(t *testing.T) {
 	cli := http.DefaultClient
 
 	testcase := []struct {
-		name string
-		req model.UpdateTODORequest
+		name       string
+		req        model.UpdateTODORequest
 		wantStatus int
 	}{
 		{
 			name: "normal",
 			req: model.UpdateTODORequest{
-				ID: 1,
-				Subject: "hello",
+				ID:          1,
+				Subject:     "hello",
 				Description: "update",
 			},
 			wantStatus: http.StatusOK,
@@ -242,7 +239,7 @@ func TestUpdate(t *testing.T) {
 		{
 			name: "empty ID",
 			req: model.UpdateTODORequest{
-				Subject: "hello",
+				Subject:     "hello",
 				Description: "update",
 			},
 			wantStatus: http.StatusBadRequest,
@@ -250,7 +247,7 @@ func TestUpdate(t *testing.T) {
 		{
 			name: "empty subject",
 			req: model.UpdateTODORequest{
-				ID: 1,
+				ID:          1,
 				Description: "update",
 			},
 			wantStatus: http.StatusBadRequest,
@@ -258,7 +255,7 @@ func TestUpdate(t *testing.T) {
 		{
 			name: "empty description",
 			req: model.UpdateTODORequest{
-				ID: 1,
+				ID:      1,
 				Subject: "hello",
 			},
 			wantStatus: http.StatusOK,
@@ -266,8 +263,8 @@ func TestUpdate(t *testing.T) {
 		{
 			name: "not found",
 			req: model.UpdateTODORequest{
-				ID: 9999999,
-				Subject: "hello",
+				ID:          9999999,
+				Subject:     "hello",
 				Description: "update",
 			},
 			wantStatus: http.StatusNotFound,
@@ -275,7 +272,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	for _, tc := range testcase {
-		t.Run(tc.name, func (t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			enc := json.NewEncoder(&buf)
 			if err := enc.Encode(tc.req); err != nil {
@@ -318,5 +315,91 @@ func TestUpdate(t *testing.T) {
 
 	if err := os.Remove(dbpath); err != nil {
 		t.Log(err)
+	}
+}
+
+func TestDelete(t *testing.T) {
+	testcase := []struct {
+		name       string
+		req        model.DeleteTODORequest
+		wantStatus int
+	}{
+		{
+			name: "single",
+			req: model.DeleteTODORequest{
+				IDs: []int64{1},
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "multi",
+			req: model.DeleteTODORequest{
+				IDs: []int64{1, 3},
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "empty",
+			req: model.DeleteTODORequest{
+				IDs: []int64{},
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "invalid id",
+			req: model.DeleteTODORequest{
+				IDs: []int64{99999},
+			},
+			wantStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tc := range testcase {
+		t.Run(tc.name, func(t *testing.T) {
+			todoDB, err := db.NewDB(dbpath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer todoDB.Close()
+
+			ctx := context.Background()
+
+			stmt, err := todoDB.PrepareContext(ctx, "INSERT INTO todos(subject, description) VALUES(?, ?)")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, data := range init_data {
+				if _, err := stmt.ExecContext(ctx, data.subject, data.description); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			ts := httptest.NewServer(handler.NewTODOHandler(service.NewTODOService(todoDB)))
+			defer ts.Close()
+			cli := http.DefaultClient
+
+			var buf bytes.Buffer
+			enc := json.NewEncoder(&buf)
+			if err := enc.Encode(tc.req); err != nil {
+				t.Fatal(err)
+			}
+
+			httpReq, err := http.NewRequest("DELETE", ts.URL, &buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			res, err := cli.Do(httpReq)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.StatusCode != tc.wantStatus {
+				t.Fatal("Incorrect response status")
+			}
+
+			if err := os.Remove(dbpath); err != nil {
+				t.Log(err)
+			}
+		})
 	}
 }
