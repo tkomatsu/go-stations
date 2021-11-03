@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strconv"
 
 	"github.com/TechBowl-japan/go-stations/model"
 )
@@ -143,7 +144,36 @@ func (s *TODOService) UpdateTODO(ctx context.Context, id int64, subject, descrip
 
 // DeleteTODO deletes TODOs on DB by ids.
 func (s *TODOService) DeleteTODO(ctx context.Context, ids []int64) error {
-	const deleteFmt = `DELETE FROM todos WHERE id IN (?%s)`
+	if len(ids) == 0 {
+		return nil
+	}
 
+	const deleteFmt = `DELETE FROM todos WHERE id IN (?%s)`
+	stmt, err := s.db.PrepareContext(ctx, deleteFmt)
+	if err != nil {
+		return err
+	}
+
+	var deleteList string
+	for i, id := range ids {
+		if i == 0 {
+			deleteList = strconv.Itoa(int(id))
+		} else {
+			deleteList = deleteList + "," + strconv.Itoa(int(id))
+		}
+	}
+
+	ret, err := stmt.ExecContext(ctx, deleteList)
+	if err != nil {
+		return err
+	}
+	affected, err := ret.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if affected == 0 {
+		return &model.ErrNotFound{What:"data not found"}
+	}
 	return nil
 }
