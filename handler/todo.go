@@ -34,6 +34,8 @@ func (h *TODOHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.updateHandler(w, r)
 	case "GET":
 		h.readHandler(w, r)
+	case "DELETE":
+		h.deleteHandler(w, r)
 	default:
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
@@ -132,6 +134,44 @@ func (h *TODOHandler) readHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, buf.String())
 }
 
+func (h *TODOHandler) deleteHandler(w http.ResponseWriter, r *http.Request) {
+	var reqBody model.DeleteTODORequest
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&reqBody); err != nil {
+		http.Error(w, fmt.Errorf("json decode: %v", err).Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if len(reqBody.IDs) == 0 {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	ret, err := h.Delete(r.Context(), &reqBody)
+	if err != nil {
+		switch err.(type) {
+		case *model.ErrNotFound:
+			http.NotFound(w, r)
+			return
+		default:
+			http.Error(w, fmt.Errorf("Unknown error: %v", err).Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	if err := enc.Encode(ret); err != nil {
+		log.Print("json encode: ", err)
+		http.Error(w, fmt.Sprintf("json encode: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-type", "application/json")
+	fmt.Fprint(w, buf.String())
+
+}
+
 // Create handles the endpoint that creates the TODO.
 func (h *TODOHandler) Create(ctx context.Context, req *model.CreateTODORequest) (*model.CreateTODOResponse, error) {
 	if req.Subject == "" {
@@ -165,6 +205,9 @@ func (h *TODOHandler) Update(ctx context.Context, req *model.UpdateTODORequest) 
 
 // Delete handles the endpoint that deletes the TODOs.
 func (h *TODOHandler) Delete(ctx context.Context, req *model.DeleteTODORequest) (*model.DeleteTODOResponse, error) {
-	_ = h.svc.DeleteTODO(ctx, nil)
+	err := h.svc.DeleteTODO(ctx, req.IDs)
+	if err != nil {
+		return nil, err
+	}
 	return &model.DeleteTODOResponse{}, nil
 }
